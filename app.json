@@ -1,7 +1,8 @@
 {
   "expo": {
-    "name": "memory",
-    "slug": "memory",
+    "name": "all-is-well",
+    "slug": "all-is-well",
+    "newArchEnabled": true ,
     "version": "1.0.0",
     "scheme": "memory",
     "web": {
@@ -28,7 +29,7 @@
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#0e0e0e"
     },
     "assetBundlePatterns": [
       "**/*"
@@ -38,8 +39,8 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "foregroundImage": "./assets/icon.png",
+        "backgroundColor": "#0e0e0e"
       }
     },
     "extra": {
