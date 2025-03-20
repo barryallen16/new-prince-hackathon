@@ -1,5 +1,5 @@
 import '../global.css';
-
+import { NavigationContainer } from '@react-navigation/native';
 import { Stack } from 'expo-router';
 
 export const unstable_settings = {
@@ -8,8 +8,10 @@ export const unstable_settings = {
 };
 
 export default function RootLayout() {
+
   return (
-    <Stack>
+  
+  <Stack>
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
     </Stack>
