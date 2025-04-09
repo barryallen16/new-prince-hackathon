@@ -16,15 +16,20 @@ interface ApiResponseData {
   text: string;
 }
 
+interface FlaskResponseData {
+  risk: string;
+  message: string;
+}
+
 const apiClient = create({
   baseURL: 'https://api.elevenlabs.io/v1',
   headers: {
-    'xi-api-key': 'sk_eec44fdc73cfdb37dddc9f1c96916faa44e722a0b47d3ce7',
+    'xi-api-key': process.env.EXPO_PUBLIC_ELEVENLABS_APIKEY as string,
   },
 });
 
 const flaskApiClient = create({
-  baseURL: 'https://1468-2402-3a80-1bbe-ad8a-5d39-506b-3cd3-ac46.ngrok-free.app',
+  baseURL: process.env.EXPO_PUBLIC_FLASK_BACKEND_ENDPOINT as string,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -36,7 +41,12 @@ const points: [number, number][] = [
   [0.0, 1.0], [0.5, 1.0], [1.0, 1.0],
 ];
 
-const colorSets = {
+type RiskLevel = 'Low' | 'Medium' | 'High';
+interface ColorSet {
+  gradientColors: string[];
+  solidColor: string;
+}
+const colorSets: Record<RiskLevel, ColorSet> = {
   Low: {
     gradientColors: [
       "#A7F3D0", "#34D399", "#6EE7B7",
@@ -68,7 +78,7 @@ export default function Home() {
   const [permissionResponse, requestPermission] = Audio.usePermissions();
   const [audioUri, setAudioUri] = useState<string | null>(null);
   const [transcription, setTranscription] = useState<string | null>(null);
-  const [risk, setRisk] = useState<string | null>(null);
+  const [risk, setRisk] = useState<RiskLevel | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -243,13 +253,13 @@ export default function Home() {
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token;
 
-      const response = await flaskApiClient.post('/predict_text', { text }, {
+      const response = await flaskApiClient.post<FlaskResponseData>('/predict_text', { text }, {
         headers: { Authorization: `Bearer ${token}` }
       });
 
       if (response.ok && response.data) {
         const { risk, message } = response.data;
-        setRisk(risk);
+        setRisk(risk as RiskLevel); // Cast to RiskLevel
         setMessage(message);
         console.log(`Predicted Risk: ${risk}, Message: ${message}`);
       } else {

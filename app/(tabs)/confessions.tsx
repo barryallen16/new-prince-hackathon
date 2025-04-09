@@ -34,7 +34,7 @@ export default function Confessions() {
       } else {
         setConfessions(data || []);
         if (data?.length === 0) {
-          setError('No confessions available yet.');
+          // setError('No confessions available yet.');
         } else {
           setError(null);
         }
@@ -46,9 +46,13 @@ export default function Confessions() {
 
     const subscription = supabase
       .channel('confessions-channel')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'confessions' }, (payload) => {
-        setConfessions((current) => [payload.new, ...current]);
-      })
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'confessions' },
+        (payload: { new: Confession }) => {
+          setConfessions((current) => [payload.new, ...current]);
+        }
+      )
       .subscribe();
 
     return () => {
