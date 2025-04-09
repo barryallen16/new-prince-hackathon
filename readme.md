@@ -5,7 +5,6 @@ a mental health intervention app built using react native and supabase.
 ```bash
 cd hackathon
 bun install
-bunx expo start --go
 ```
 
 ## Run Flask backend 
@@ -29,5 +28,9 @@ EXPO_PUBLIC_ELEVENLABS_APIKEY=your-actual-elevenlabs-apikey
 EXPO_PUBLIC_SUPABASE_URL=your-actual-supabase-project-url
 EXPO_PUBLIC_SUPABASE_ANON_KEY=your-actual-supabase-anon-key
 ```
+replace with the actual values. 
 
-## scan the qr generated in expo go app and test out the applications 
+## Run the expo app , scan the qr generated in expo go app and test out the applications 
+```bash
+bunx expo start --go
+```
