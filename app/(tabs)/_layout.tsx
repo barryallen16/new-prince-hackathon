@@ -5,39 +5,6 @@ import { supabase } from '~/utils/supabase';
 import { Alert } from 'react-native';
 import { TabBarIcon } from '../../components/TabBarIcon';
 export default function TabLayout() {
-  useEffect(() => {
-    const initializeAuth = async () => {
-      // Check if there's an existing session
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session) {
-        // No existing session, sign in anonymously
-        const { data, error } = await supabase.auth.signInAnonymously();
-        if (error) {
-          console.error('Anonymous sign-in failed:', error.message);
-          if (error.message.includes('Too many requests')) {
-            Alert.alert(
-              'Rate Limit Exceeded',
-              'Too many sign-in attempts from this device. Please try again in an hour or use a different network.'
-            );
-          } else if (error.message.includes('Signups not allowed')) {
-            Alert.alert(
-              'Sign-In Error',
-              'Anonymous sign-ins are disabled for this app. Please contact support.'
-            );
-          } else {
-            Alert.alert('Error', 'Failed to sign in anonymously. Please try again.');
-          }
-        } else {
-          console.log('Signed in anonymously:', data.user?.id);
-        }
-      } else {
-        console.log('User already signed in:', session.user.id);
-      }
-    };
-
-    initializeAuth();
-  }, []);
 
   return (
     <Tabs
@@ -59,17 +26,20 @@ export default function TabLayout() {
           ),
         }}
       />
-            <Tabs.Screen
-        name="two"
+        
+        <Tabs.Screen
+        name="Activity"
         options={{
-          title: 'Tab Two',
+          headerShown: false,
+          title: 'daily activities',
           tabBarIcon: ({ color }) => <TabBarIcon name="code" color={color} />,
         }}
       />
       <Tabs.Screen
-        name="confessions"
+        name="Chat"
         options={{
-          title: 'Confessions',
+          headerShown: false,
+          title: 'Chat',
           tabBarIcon: ({ color, size }) => (
             <MaterialIcons name="chat" size={size} color={color} />
           ),
@@ -79,6 +49,7 @@ export default function TabLayout() {
         name="profile"
         options={{
           title: 'profile',
+          headerShown: false,
           tabBarIcon: ({ color, size }) => (
             <MaterialIcons name="face" size={size} color={color} />
           ),

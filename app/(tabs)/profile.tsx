@@ -8,41 +8,16 @@ const Profile = () => {
 
   const handleSignOut = async () => {
     try {
-      // Sign out the current user
-      const { error: signOutError } = await supabase.auth.signOut();
-      if (signOutError) {
-        console.error("Sign-out failed:", signOutError.message);
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        console.error("Sign-out failed:", error.message);
         Alert.alert("Error", "Failed to sign out. Please try again.");
         return;
       }
-
-      // Sign in as a new anonymous user
-      const { data, error: signInError } = await supabase.auth.signInAnonymously();
-      if (signInError) {
-        console.error("Anonymous sign-in failed:", signInError.message);
-        if (signInError.message.includes("Too many requests")) {
-          Alert.alert(
-            "Rate Limit Exceeded",
-            "Too many sign-in attempts from this device. Please try again in an hour or use a different network."
-          );
-        } else if (signInError.message.includes("Signups not allowed")) {
-          Alert.alert(
-            "Sign-In Error",
-            "Anonymous sign-ins are disabled for this app. Please contact support."
-          );
-        } else {
-          Alert.alert("Error", "Failed to sign in anonymously. Please try again.");
-        }
-        return;
-      }
-
-      console.log("Signed in as new anonymous user:", data.user?.id);
-
-      // Show confirmation and redirect to Home screen
-      Alert.alert("Success", "You have been signed out and signed in as a new user.", [
+      Alert.alert("Success", "You have been signed out.", [
         {
           text: "OK",
-          onPress: () => router.replace("/(tabs)"),
+          onPress: () => router.replace("/auth"),
         },
       ]);
     } catch (err) {

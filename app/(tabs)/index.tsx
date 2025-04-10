@@ -1,4 +1,4 @@
-import { View, Text, Pressable, Alert, ActivityIndicator, TextInput, KeyboardAvoidingView, ScrollView, Platform } from 'react-native';
+import { View, Text, Pressable, Alert, ActivityIndicator, TextInput, KeyboardAvoidingView, ScrollView, Platform, Keyboard } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Audio } from 'expo-av';
 import { useEffect, useState } from 'react';
@@ -7,6 +7,8 @@ import * as FileSystem from 'expo-file-system';
 import FormData from 'form-data';
 import { MaterialIcons } from '@expo/vector-icons';
 import { MeshGradientView } from 'expo-mesh-gradient';
+import { supabase } from '~/utils/supabase';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
 
 interface ApiResponseData {
   language_code: string;
@@ -81,6 +83,35 @@ export default function Home() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [inputText, setInputText] = useState<string>('');
+  const [confessionText, setConfessionText] = useState<string>('');
+
+  const confessionSectionHeight = useSharedValue(0);
+  const thoughtsSectionHeight = useSharedValue(0);
+  const [isConfessionSectionOpen, setIsConfessionSectionOpen] = useState(false);
+  const [isThoughtsSectionOpen, setIsThoughtsSectionOpen] = useState(false);
+
+  const MAX_CONFESSION_LENGTH = 500;
+
+  const confessionSectionStyle = useAnimatedStyle(() => ({
+    height: withTiming(confessionSectionHeight.value, { duration: 300 }),
+    opacity: withTiming(confessionSectionHeight.value > 0 ? 1 : 0, { duration: 300 }),
+  }));
+
+  const thoughtsSectionStyle = useAnimatedStyle(() => ({
+    height: withTiming(thoughtsSectionHeight.value, { duration: 300 }),
+    opacity: withTiming(thoughtsSectionHeight.value > 0 ? 1 : 0, { duration: 300 }),
+  }));
+
+  const toggleConfessionSection = () => {
+    setIsConfessionSectionOpen(!isConfessionSectionOpen);
+    confessionSectionHeight.value = isConfessionSectionOpen ? 0 : 200; // Adjusted height
+  };
+
+  const toggleThoughtsSection = () => {
+    setIsThoughtsSectionOpen(!isThoughtsSectionOpen);
+    thoughtsSectionHeight.value = isThoughtsSectionOpen ? 0 : 100;
+  };
+
 
   useEffect(() => {
     (async () => {
@@ -181,6 +212,11 @@ export default function Home() {
       console.error('Error transcribing:', err);
       setError('An error occurred during transcription.');
     } finally {
+      if (audioUri) {
+        await FileSystem.deleteAsync(audioUri).catch((err) => {
+          console.error('Failed to delete audio file:', err);
+        });
+      }
       setIsProcessing(false);
     }
   }
@@ -188,11 +224,16 @@ export default function Home() {
   async function predictRisk(text: string) {
     try {
       setIsProcessing(true);
-      const response = await flaskApiClient.post<FlaskResponseData>('/predict_text', { text });
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+
+      const response = await flaskApiClient.post<FlaskResponseData>('/predict_text', { text }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
 
       if (response.ok && response.data) {
         const { risk, message } = response.data;
-        setRisk(risk as RiskLevel); // Ensure risk matches RiskLevel
+        setRisk(risk as RiskLevel); // Cast to RiskLevel
         setMessage(message);
         console.log(`Predicted Risk: ${risk}, Message: ${message}`);
       } else {
@@ -217,6 +258,49 @@ export default function Home() {
     setMessage(null);
     setError(null);
     await predictRisk(inputText);
+    Keyboard.dismiss();
+  };
+
+  const handleConfessionSubmit = async () => {
+    if (!confessionText.trim()) {
+      Alert.alert('Error', 'Please enter a confession to submit.');
+      return;
+    }
+
+    if (confessionText.length > MAX_CONFESSION_LENGTH) {
+      Alert.alert('Error', `Confession must be ${MAX_CONFESSION_LENGTH} characters or less.`);
+      return;
+    }
+
+    try {
+      setIsProcessing(true);
+      const { data, error } = await supabase
+        .from('confessions')
+        .insert({ content: confessionText })
+        .select('id, content, created_at')
+        .single();
+
+      if (error) {
+        console.error('Failed to submit confession:', error.message);
+        if (error.message.includes('permission denied')) {
+          Alert.alert(
+            'Permission Error',
+            'You do not have permission to submit a confession. Please try signing in again.'
+          );
+        } else {
+          Alert.alert('Error', 'Failed to submit your confession. Please try again.');
+        }
+      } else {
+        Alert.alert('Success', 'Your confession has been submitted anonymously.');
+        setConfessionText('');
+        Keyboard.dismiss();
+      }
+    } catch (err) {
+      console.error('Error submitting confession:', err);
+      Alert.alert('Error', 'An unexpected error occurred. Please try again.');
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const currentColors = risk ? colorSets[risk] : colorSets.Low;
@@ -240,72 +324,123 @@ export default function Home() {
           className="flex-1"
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
-          contentContainerStyle={{ flexGrow: 1 }}
+          contentContainerStyle={{ flexGrow: 1, paddingBottom: 20 }}
         >
-          <View className="bg-header-bg p-5 items-center border-b border-border-gray">
-            <Text className="text-white text-2xl font-bold">ALL IS WELL</Text>
+          <View className="bg-gray-900 p-5 items-center border-b border-gray-700 shadow-md">
+            <Text className="text-white text-3xl font-extrabold tracking-wide">All Is Well</Text>
           </View>
 
-          <View className="flex-1 justify-center items-center p-5">
-            {isProcessing && <ActivityIndicator size="large" color="#ffffff" className="mb-5" />}
-            <View className="w-full mb-5">
-              <Text className="text-black text-base font-bold mb-2">Or Type Your Thoughts:</Text>
-              <TextInput
-                className="bg-gray-800 text-white text-lg p-3 rounded-lg w-full"
-                placeholder="Enter your thoughts here..."
-                placeholderTextColor="#a0a0a0"
-                value={inputText}
-                onChangeText={setInputText}
-                multiline
-              />
-              <Pressable
-                className="bg-blue-500 py-3 px-6 rounded-lg mt-3 self-center"
-                onPress={handleTextSubmit}
-              >
-                <Text className="text-white text-lg font-semibold">Submit</Text>
-              </Pressable>
+          <View className="flex-1 p-4">
+            {isProcessing && (
+              <ActivityIndicator size="large" color="#A7F3D0" className="mb-4" />
+            )}
+
+            <View className="items-center mb-6">
+              <Text className="text-white text-lg font-semibold mb-3">Record Your Thoughts</Text>
+              {!recording ? (
+                <Pressable
+                  className="flex-row items-center bg-green-600 py-3 px-6 rounded-full shadow-lg"
+                  onPress={StartRecording}
+                >
+                  <MaterialIcons name="mic" size={24} color="#ffffff" />
+                  <Text className="text-white text-lg font-semibold ml-2">Start Recording</Text>
+                </Pressable>
+              ) : (
+                <Pressable
+                  className="flex-row items-center bg-red-600 py-3 px-6 rounded-full shadow-lg"
+                  onPress={StopRecording}
+                >
+                  <MaterialIcons name="stop" size={24} color="#ffffff" />
+                  <Text className="text-white text-lg font-semibold ml-2">Stop Recording</Text>
+                </Pressable>
+              )}
             </View>
 
-            {!recording ? (
-              <Pressable
-                className="flex-row items-center bg-start-green py-4 px-6 rounded-lg"
-                onPress={StartRecording}
-              >
-                <MaterialIcons name="mic" size={24} color="#ffffff" />
-                <Text className="text-white text-lg font-semibold ml-2">Start Recording</Text>
+            <View className="bg-gray-800 rounded-xl p-4 mb-4 shadow-md">
+              <Pressable onPress={toggleConfessionSection} className="flex-row justify-between items-center">
+                <Text className="text-white text-lg font-semibold">Share a Confession</Text>
+                <MaterialIcons
+                  name={isConfessionSectionOpen ? 'keyboard-arrow-up' : 'keyboard-arrow-down'}
+                  size={24}
+                  color="#A7F3D0"
+                />
               </Pressable>
-            ) : (
-              <Pressable
-                className="flex-row items-center bg-stop-red py-4 px-6 rounded-lg"
-                onPress={StopRecording}
-              >
-                <MaterialIcons name="stop" size={24} color="#ffffff" />
-                <Text className="text-white text-lg font-semibold ml-2">Stop Recording</Text>
+              <Animated.View style={confessionSectionStyle}>
+                <TextInput
+                  className="bg-gray-700 text-white text-base p-3 rounded-lg mt-3 h-32"
+                  placeholder="Write your confession here..."
+                  placeholderTextColor="#A0A0A0"
+                  value={confessionText}
+                  onChangeText={setConfessionText}
+                  multiline
+                  maxLength={MAX_CONFESSION_LENGTH}
+                />
+                <Text className="text-gray-400 text-sm mt-2 self-end">
+                  {confessionText.length}/{MAX_CONFESSION_LENGTH}
+                </Text>
+                <Pressable
+                  className="bg-purple-600 py-3 px-6 rounded-lg mt-3 self-center shadow-md"
+                  onPress={handleConfessionSubmit}
+                >
+                  <Text className="text-white text-base font-semibold">Submit Confession</Text>
+                </Pressable>
+              </Animated.View>
+            </View>
+
+            <View className="bg-gray-800 rounded-xl p-4 mb-4 shadow-md ">
+              <Pressable onPress={toggleThoughtsSection} className="flex-row justify-between items-center">
+                <Text className="text-white text-lg font-semibold">Type Your Thoughts</Text>
+                <MaterialIcons
+                  name={isThoughtsSectionOpen ? 'keyboard-arrow-up' : 'keyboard-arrow-down'}
+                  size={24}
+                  color="#A7F3D0"
+                />
               </Pressable>
-            )}
+              <Animated.View style={thoughtsSectionStyle}>
+                <TextInput
+                  className="bg-gray-700 text-white text-base p-3 rounded-lg mt-3 "
+                  placeholder="Enter your thoughts here..."
+                  placeholderTextColor="#A0A0A0"
+                  value={inputText}
+                  onChangeText={setInputText}
+                  multiline
+                />
+                <Pressable
+                  className="bg-blue-600 py-3 px-6 rounded-lg mt-3 self-center shadow-md"
+                  onPress={handleTextSubmit}
+                >
+                  <Text className="text-white text-base font-semibold">Submit</Text>
+                </Pressable>
+              </Animated.View>
+            </View>
 
-            {transcription && (
-              <View className="mt-5 items-center w-full">
-                <Text className="text-white text-base font-bold">Transcription:</Text>
-                <Text className="text-white text-lg mt-1 text-center">{transcription}</Text>
+            {(transcription || risk || message) && (
+              <View className="bg-gray-800 rounded-xl p-4 mb-4 shadow-md">
+                <Text className="text-white text-lg font-semibold mb-3">Results</Text>
+                {transcription && (
+                  <View className="mb-3">
+                    <Text className="text-white text-base font-medium">Transcription:</Text>
+                    <Text className="text-gray-300 text-base mt-1">{transcription}</Text>
+                  </View>
+                )}
+                {risk && (
+                  <View className="mb-3">
+                    <Text className="text-white text-base font-medium">Predicted Risk:</Text>
+                    <Text className="text-gray-300 text-base mt-1">{risk}</Text>
+                  </View>
+                )}
+                {message && (
+                  <View>
+                    <Text className="text-white text-base font-medium">Message for You:</Text>
+                    <Text className="text-gray-300 text-base mt-1">{message}</Text>
+                  </View>
+                )}
               </View>
             )}
 
-            {risk && (
-              <View className="mt-5 items-center w-full">
-                <Text className="text-black text-base font-bold">Predicted Risk:</Text>
-                <Text className="text-black text-lg mt-1 text-center">{risk}</Text>
-              </View>
+            {error && (
+              <Text className="text-red-400 text-base mt-4 text-center">{error}</Text>
             )}
-
-            {message && (
-              <View className="mt-5 items-center w-full">
-                <Text className="text-black text-base font-bold">Message for You:</Text>
-                <Text className="text-black text-lg mt-1 text-center">{message}</Text>
-              </View>
-            )}
-
-            {error && <Text className="text-error-red text-base mt-5 text-center">{error}</Text>}
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
